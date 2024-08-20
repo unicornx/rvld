@@ -14,10 +14,29 @@ type ContextArgs struct {
  * @Phdr
  * @Got
  * @TpAddr
- * @OutputSections
+ * @OutputSections: 输出文件中需要产生的 sections
+ *                  这些 sections 的创建参考 GetOutputSection()
+ *                  在遍历所有输入的 obj 文件的过程中，会触发该函数
+ *                  main
+ *                  -> ReadInputFiles
+ *                     -> ReadFile
+ *                        -> CreateObjectFile
+ *                           -> Parse
+ *                              -> InitializeSections
+ *                                 -> NewInputSection
+ *                                    -> GetOutputSection
  * @Chunks
- * @Objs
- * @SymbolMap
+ * @Objs: 所有输入文件中的 obj 文件，包括 .o 文件以及 .a 文件中 extracted 的 .o 文件
+ * @SymbolMap: 所有输入文件的 GLOBAL 符号。
+ *             这些符号的添加动作参考 GetSymbolByName() 函数
+ *             在遍历所有输入的 obj 文件的过程中，会触发该函数
+  *                  main
+ *                  -> ReadInputFiles
+ *                     -> ReadFile
+ *                        -> CreateObjectFile
+ *                           -> Parse
+ *                              -> InitializeSymbols
+ *                                 -> GetSymbolByName
  * @MergedSections: 用于保存 Merged 的 Sections
  */
 type Context struct {

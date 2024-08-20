@@ -11,7 +11,7 @@ import (
  * ObjectFile 是 InputFile 的子类
  * 除了继承 InputFile 的属性外，还具备以下属性
  *
- * @SymtabSec：指向符号表所对应的 Section
+ * @SymtabSec：一个指向符号表所对应的 ELF Section 的指针
  *
  * @SymtabShndxSec: 背景知识，和 SHT_SYMTAB_SHNDX 有关
  *  符号表的每一项 Elf_Sym 中有个字段 st_shndx (符号所在 section 的 index)
@@ -54,11 +54,16 @@ func NewObjectFile(file *File, isAlive bool) *ObjectFile {
 }
 
 // 进一步解析 object 文件
-// 获取以下信息 
-// SymtabSec
-// FirstGlobal
-// ElfSyms
-// SymbolStrtab
+// 获取以下信息
+// 符号表的相关信息，包括 
+// ObjectFile::SymtabSec
+// ObjectFile::FirstGlobal, 继承自 InputFile
+// ObjectFile::ElfSyms，继承自 InputFile
+// ObjectFile::SymbolStrtab，继承自 InputFile
+//
+// ObjectFile::Sections, 由 o.InitializeSections() 完成
+//
+// ObjectFile::Symbols， 由 o.InitializeSymbols() 完成
 func (o *ObjectFile) Parse(ctx *Context) {
 	// 获取并保存符号表 section header
 	o.SymtabSec = o.FindSection(uint32(elf.SHT_SYMTAB))
@@ -74,7 +79,8 @@ func (o *ObjectFile) Parse(ctx *Context) {
 	// 根据对应 obj 文件中的 ELF section 初始化 ObjectFile::Sections
 	o.InitializeSections(ctx)
 
-	// 解析文件的符号，LOCAL 符号放在 ObjectFile 中保存，GLOBAL 符号放在 Context 中保存
+	// 解析文件的符号，初始化 ObjectFile::Symbols。
+	// LOCAL 符号放在 ObjectFile 中保存，GLOBAL 符号放在 Context 中保存
 	o.InitializeSymbols(ctx)
 
 	// 
@@ -135,7 +141,7 @@ func (o *ObjectFile) InitializeSymbols(ctx *Context) {
 		return
 	}
 
-	// 创建 LocalSymbols 数组
+	// 创建 LocalSymbols 数组并初始化为空值
 	o.LocalSymbols = make([]Symbol, o.FirstGlobal)
 	for i := 0; i < len(o.LocalSymbols); i++ {
 		o.LocalSymbols[i] = *NewSymbol("")
@@ -158,9 +164,9 @@ func (o *ObjectFile) InitializeSymbols(ctx *Context) {
 		}
 	}
 
-	// 对 InputFile::Symbols 初始化
-	// InputFile::Symbols 由两部分组成，
-	// 一部分是 LOCAL 符号，所以直接指向 InputFile::LocalSymbols 的成员
+	// 对 ObjectFile::Symbols 初始化
+	// ObjectFile::Symbols 由两部分组成，
+	// 一部分是 LOCAL 符号，所以直接指向 ObjectFile::LocalSymbols 的成员
 	o.Symbols = make([]*Symbol, len(o.ElfSyms))
 	for i := 0; i < len(o.LocalSymbols); i++ {
 		o.Symbols[i] = &o.LocalSymbols[i]

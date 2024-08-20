@@ -37,7 +37,7 @@ func CreateObjectFile(ctx *Context, file *File, inLib bool) *ObjectFile {
 	// 确保打开的是 RISCV 文件
 	CheckFileCompatibility(ctx, file)
 
-	// 创建 ObjectFile 对象时，
+	// 创建 ObjectFile 对象，返回的是 ObjectFile 的指针
 	// 对 FileTypeObject 的 .o 默认 alive 都设置为 true
 	// 对 FileTypeArchive 中的 .o 默认 alive 为 false
 	// alive 说明需要加入最终的 output
