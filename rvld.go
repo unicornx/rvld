@@ -13,8 +13,11 @@ var version string
 
 func main() {
 	ctx := linker.NewContext()
+	// 解析命令行选项和参数
 	remaining := parseArgs(ctx)
 
+	// 如果命令行中没有明确指明 "-m target", 那么我们自己去看一下 .o 文件的类型
+	// 目前只会根据第一个遇到的可识别 obj 文件的 ARCH 类型作为 machine type
 	if ctx.Args.Emulation == linker.MachineTypeNone {
 		for _, filename := range remaining {
 			if strings.HasPrefix(filename, "-") {
@@ -34,6 +37,7 @@ func main() {
 		utils.Fatal("unknown emulation type")
 	}
 
+	// 从命令行中根据 .o 或者 .a 将 obj 文件转化为 ObjectFile 并添加到 Context::Objs 容器中
 	linker.ReadInputFiles(ctx, remaining)
 	linker.ResolveSymbols(ctx)
 	linker.RegisterSectionPieces(ctx)
@@ -74,6 +78,7 @@ func parseArgs(ctx *linker.Context) []string {
 		return []string{"-" + name, "--" + name}
 	}
 
+	// readArg 是处理形如 "-o a.out", 即选项后面有参数的形式的
 	arg := ""
 	readArg := func(name string) bool {
 		for _, opt := range dashes(name) {
@@ -101,6 +106,7 @@ func parseArgs(ctx *linker.Context) []string {
 		return false
 	}
 
+	// readFlag 是处理形如 "-v" 只有选项，后面没有参数的
 	readFlag := func(name string) bool {
 		for _, opt := range dashes(name) {
 			if args[0] == opt {
@@ -112,6 +118,8 @@ func parseArgs(ctx *linker.Context) []string {
 		return false
 	}
 
+	// 可以识别的（包括忽略的）解析后进入 Context::Args，
+	// 剩下加入到 remaining 的就是一些形如 "xx.o"（obj 文件） 和 "-lc"（archive 文件）
 	remaining := make([]string, 0)
 	for len(args) > 0 {
 		if readFlag("help") {

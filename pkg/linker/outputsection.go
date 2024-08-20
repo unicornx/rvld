@@ -29,12 +29,16 @@ func (o *OutputSection) CopyBuf(ctx *Context) {
 	}
 }
 
+// 返回值是一个 OutputSection 的指针
 func GetOutputSection(
 	ctx *Context, name string, typ, flags uint64) *OutputSection {
+	// 根据 InputSection 的 name 和 flags，映射获得对应的 OutputSection 的名字
 	name = GetOutputName(name, flags)
+	// FIXME
 	flags = flags &^ uint64(elf.SHF_GROUP) &^
 		uint64(elf.SHF_COMPRESSED) &^ uint64(elf.SHF_LINK_ORDER)
 
+	// 内嵌定义个 find 函数
 	find := func() *OutputSection {
 		for _, osec := range ctx.OutputSections {
 			if name == osec.Name && typ == uint64(osec.Shdr.Type) &&
@@ -45,10 +49,15 @@ func GetOutputSection(
 		return nil
 	}
 
+	// 调用内嵌定义的 find 函数，搜索一下 Context::OutputSections 中是否
+	// 已经注册了这个名字的 OutputSection
+	// 如果找到就返回
 	if osec := find(); osec != nil {
 		return osec
 	}
 
+	// 如果没有找到，就用这个名字新注册一个到 Context::OutputSections 中再
+	// 返回
 	osec := NewOutputSection(name, uint32(typ), flags,
 		uint32(len(ctx.OutputSections)))
 	ctx.OutputSections = append(ctx.OutputSections, osec)

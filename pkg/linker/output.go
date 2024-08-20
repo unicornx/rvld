@@ -11,6 +11,7 @@ var prefixes = []string{
 	".ctors.", ".dtors.",
 }
 
+// 获取允我们支持的在 output 文件中允许出现的 section 的名字
 func GetOutputName(name string, flags uint64) string {
 	if (name == ".rodata" || strings.HasPrefix(name, ".rodata.")) &&
 		flags&uint64(elf.SHF_MERGE) != 0 {

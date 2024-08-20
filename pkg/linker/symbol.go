@@ -6,6 +6,17 @@ const (
 	NeedsGotTp uint32 = 1 << 0
 )
 
+/*
+ * 用于 linker 内部处理的符号对象，和 ELF 的 Elf_Sym 有一一对应关系，但是 Symbol
+ * 对象含有 linker 内部处理需要的上下文信息
+ * @File: 标志该 Symbol 属于哪个 ObjectFile
+ * @Name：符号的字符串值
+ * @Value: Elf_Sym::st_value
+ * @SymIdx: 符号在符号表中的index
+ *
+ * @InputSection: 符号所在的 Input section
+ * @SectionFragment: 
+ */
 type Symbol struct {
 	File     *ObjectFile
 	Name     string

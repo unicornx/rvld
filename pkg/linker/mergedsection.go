@@ -6,6 +6,12 @@ import (
 	"sort"
 )
 
+/*
+ * 见 
+ * - https://docs.oracle.com/en/operating-systems/solaris/oracle-solaris/11.4/linkers-libraries/section-merging.html
+ * - https://blog.csdn.net/qq_42570601/article/details/124695589 Elf_Shdr::sh_flag 取值为 SHF_XXX
+ * 
+ */
 type MergedSection struct {
 	Chunk
 	Map map[string]*SectionFragment

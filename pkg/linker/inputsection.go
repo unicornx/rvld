@@ -7,6 +7,21 @@ import (
 	"math/bits"
 )
 
+/*
+ * 和 ELF 文件中的 Elf Section 一一对应的 InputSection 对象，用于 linker
+ * 内部的处理
+ * @File: 含有该 section 的 ObjectFile 对象
+ * @Contents: 该 section 的 rawdata
+ * @Shndx: 该 section 在 section header table 中的 index
+ * @ShSize: 该 section rawdata 的 size
+ * @IsAlive: FIXME：这个和 Inputfile 中的 IsAlive 有何区别？好像和 merge 有关， 是不是用来标记一个 Section 是否被 merge 了
+ * @P2Align: Elf_hdr::sh_addralign 表示地址对齐的 2 的指数值。譬如 2 表示 2^2=4 字节对齐，3 表示 2^3=8 字节对齐
+ * @Offset:
+ * @OutputSection: 该 input section 对应的 output section
+ * @RelsecIdx: 对于类型为 SHT_RELA 的 section（重定位表），这个属性存放了该重定位
+ *             表所作用的 section 在 section table 中的 index 
+ * @Rels: 
+ */
 type InputSection struct {
 	File     *ObjectFile
 	Contents []byte
@@ -22,22 +37,26 @@ type InputSection struct {
 	Rels      []Rela
 }
 
+// 根据一个 ELF section 创建一个 InputSection
 func NewInputSection(ctx *Context, name string, file *ObjectFile, shndx uint32) *InputSection {
 	s := &InputSection{
-		File:      file,
-		Shndx:     shndx,
-		IsAlive:   true,
+		File:      file, // InputSection::File
+		Shndx:     shndx,// InputSection::Shndx
+		IsAlive:   true, // 注意这里 InputSection::IsAlive 默认为 true
 		Offset:    math.MaxUint32,
 		RelsecIdx: math.MaxUint32,
 		ShSize:    math.MaxUint32,
 	}
 
+	// 填写 InputSection::Contexts 的内容，以备后面使用
 	shdr := s.Shdr()
 	s.Contents = file.File.Contents[shdr.Offset : shdr.Offset+shdr.Size]
 
+	// InputSection::ShSize， 这个和 InputSection::Contexts 是配套使用的
 	utils.Assert(shdr.Flags&uint64(elf.SHF_COMPRESSED) == 0)
 	s.ShSize = uint32(shdr.Size)
 
+	// InputSection::P2Align
 	toP2Align := func(align uint64) uint8 {
 		if align == 0 {
 			return 0
@@ -46,6 +65,13 @@ func NewInputSection(ctx *Context, name string, file *ObjectFile, shndx uint32) 
 	}
 	s.P2Align = toP2Align(shdr.AddrAlign)
 
+	// InputSection::OutputSection
+	// InputSection 和 OutputSection 之间是多对一的关系
+	// 这里我们通过 GetOutputSection 找到当前这个 InputSection
+	// 对应的 OutputSection。
+	// GetOutputSection 中隐含了向 Context 注册新的 OutputSection
+	// 的动作，所以我们对所有的 InputSection 都执行完 NewInputSection
+	// 后 Context::OutputSections 就包含了所有我们需要输出的 section 项目。
 	s.OutputSection = GetOutputSection(
 		ctx, name, uint64(shdr.Type), shdr.Flags)
 

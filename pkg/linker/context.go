@@ -6,6 +6,20 @@ type ContextArgs struct {
 	LibraryPaths []string
 }
 
+/*
+ * @Args: 我们感兴趣的一些需要记下来的命令行选项参数值
+ * @Buf
+ * @Ehdr
+ * @Shdr
+ * @Phdr
+ * @Got
+ * @TpAddr
+ * @OutputSections
+ * @Chunks
+ * @Objs
+ * @SymbolMap
+ * @MergedSections: 用于保存 Merged 的 Sections
+ */
 type Context struct {
 	Args ContextArgs
 	Buf  []byte
