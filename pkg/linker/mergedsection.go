@@ -33,9 +33,13 @@ func NewMergedSection(
 func GetMergedSectionInstance(
 	ctx *Context, name string, typ uint32, flags uint64) *MergedSection {
 	name = GetOutputName(name, flags)
+	
+	// FIXME: SHF_MERGE 与 SHF_STRINGS 或许尚可理解
+	// 但是为何要扯上 SHF_GROUP 和 SHF_COMPRESSED？
 	flags = flags & ^uint64(elf.SHF_GROUP) & ^uint64(elf.SHF_MERGE) &
 		^uint64(elf.SHF_STRINGS) & ^uint64(elf.SHF_COMPRESSED)
 
+	// 根据 name、flags 和 type 三个属性寻找相同的 merged section
 	find := func() *MergedSection {
 		for _, osec := range ctx.MergedSections {
 			if name == osec.Name && flags == osec.Shdr.Flags &&
@@ -47,10 +51,12 @@ func GetMergedSectionInstance(
 		return nil
 	}
 
+	// 如果找到就直接返回这个
 	if osec := find(); osec != nil {
 		return osec
 	}
 
+	// 否则就新建一个 merged section
 	osec := NewMergedSection(name, flags, typ)
 	ctx.MergedSections = append(ctx.MergedSections, osec)
 	return osec

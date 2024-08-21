@@ -38,6 +38,18 @@ type ContextArgs struct {
  *                              -> InitializeSymbols
  *                                 -> GetSymbolByName
  * @MergedSections: 用于保存 Merged 的 Sections
+ *                  有关 Merged Section 的概念和 section header entry 中的 SHF_MERGE 的有关，
+ *                  参考 https://refspecs.linuxbase.org/elf/gabi4+/ch4.sheader.html
+ *                  大致的意思是说，存在以下两种情况：
+ *                  情况一，Elf_Shdr::sh_flag 中 SHF_MERGE 比特位被置上，
+*                           但是 SHF_STRINGS 没有被设置，此时
+ *                          该 section 的内容由多个固定长度的元素构成，
+ *                          元素的大小参考 Elf_Shdr::sh_entsize 
+ *                  情况二，Elf_Shdr::sh_flag 中 SHF_MERGE 和 SHF_STRINGS 比特位
+ *                          都被置上，则该 section 的内容
+ *                          由多个以零结尾的字符串构成，注意字符串的每个字符的宽
+ *                          度不固定，具体大小由 Elf_Shdr::sh_entsize 的值确定。
+ *                  对于以上两种情况的多个输入文件中的 section 的元素内容，如果出现重复的情况可以被合并（merge）
  */
 type Context struct {
 	Args ContextArgs
