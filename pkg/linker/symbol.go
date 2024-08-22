@@ -9,7 +9,7 @@ const (
 /*
  * 用于 linker 内部处理的符号对象，和 ELF 的 Elf_Sym 有一一对应关系，但是 Symbol
  * 对象含有 linker 内部处理需要的上下文信息
- * @File: 标志该 Symbol 属于哪个 ObjectFile
+ * @File: 标志该 Symbol 属于哪个 ObjectFile，即在哪个文件中定义的
  * @Name：符号的字符串值
  * @Value: Elf_Sym::st_value
  * @SymIdx: 符号在符号表中的index

@@ -14,10 +14,11 @@ import (
  * @ShStrtab: Section Header 字符串的 rawdata，本质上是一个 byte 数组，内部字符串以 '\0' 结尾
  * @SymbolStrtab: 符号表字符串的 rawdata，其实就是对应的 .strtab section
  * @IsAlive: 标记该文件是否最终要输出到 Output
- * @Symbols: 该文件中所有的符号，包括 LOCAL 和 GLOBAL，注意这里存放的是 Symbol* ，
- *           实际的 LOCAL 符号对象放在下面的 LocalSymbols 中
+ * @Symbols: 一个 InputFile（这里主要是指 ObjectFile）文件中所有的符号，
+ *           包括 LOCAL 和 GLOBAL，经过解析处理后，具体参考 ObjectFile::InitializeSymbols
+ *           实际的 LOCAL 符号对象放在 InputFile::LocalSymbols 中
  *           实际的 GLOBAL 符号对象放在 Context::SymbolMap 中
- *           可以参考 ObjectFile::InitializeSymbols
+ *           而 InputFile::Symbols 存放的是 Symbol*，这些指针分别指向实际的 Symbol 对象
  *           注意 Symbol 和 Sym 不同，Sym 是 ELF 的概念， Symbol 是 Linker 的概念
  * @LocalSymbols: 该文件的 LOCAL 符号，存放形式是一个 Symbol 的数组
  */

@@ -17,6 +17,7 @@ import (
  * @IsAlive: FIXME：这个和 Inputfile 中的 IsAlive 有何区别？
  *           标识这个 mergebale 的 InputSection 是否已经被 split 处理过？
  *           参考 InitializeMergeableSections()
+ *           标识这个 input section 是 ".eh_frame" 的
  * @P2Align: Elf_hdr::sh_addralign 表示地址对齐的 2 的指数值。譬如 2 表示 2^2=4 字节对齐，3 表示 2^3=8 字节对齐
  * @Offset:
  * @OutputSection: 该 input section 对应的 output section

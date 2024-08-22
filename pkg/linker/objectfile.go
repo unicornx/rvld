@@ -26,7 +26,8 @@ import (
  *  的字段 st_shndx 就为 SHN_XINDEX，此时这个符号所在的 section 的 index 值我们就
  *  需要到一个特殊的 section，即 type 为 SHT_SYMTAB_SHNDX 的 section 中去查找。
  *
- * @Sections: 与 obj 文件中 Elf section 一一对应的 InputSection，方便 linker 内部处理
+ * @Sections: 是一个 InputSection 的指针数组。
+ *            与 obj 文件中 Elf section 一一对应的 InputSection，方便 linker 内部处理
  *            但需要注意，并不是所有的 ELF section 都会创建对应的 InputSection 对象
  *            所以说虽然 ObjectFile::Sections 数组的个数和 InputFile::ElfSections
  *            的个数相同，但 ObjectFile::Sections 中实际有效的 InputSection 的个数
@@ -93,6 +94,7 @@ func (o *ObjectFile) Parse(ctx *Context) {
 	// 处理后的结果存放在 ObjectFile::MergeableSections
 	o.InitializeMergeableSections(ctx)
 	
+	// 跳过 ".eh_frame" 的 section
 	o.SkipEhframeSections()
 }
 
@@ -148,11 +150,13 @@ func (o *ObjectFile) InitializeSymbols(ctx *Context) {
 		return
 	}
 
-	// 创建 LocalSymbols 数组并初始化为空值
+	// 创建 LocalSymbols 数组，LocalSymbols 数组的个数为 o.FirstGlobal
 	o.LocalSymbols = make([]Symbol, o.FirstGlobal)
+	// 并初始化为空值
 	for i := 0; i < len(o.LocalSymbols); i++ {
 		o.LocalSymbols[i] = *NewSymbol("")
 	}
+	// LocalSymbols 的 File 指向自身所在的 obj 文件
 	o.LocalSymbols[0].File = o
 
 	// 从 index 为 1 的符号开始，对 Local 符号对应的 Symbol 数组 LocalSymbols 进行初始化
@@ -171,10 +175,10 @@ func (o *ObjectFile) InitializeSymbols(ctx *Context) {
 		}
 	}
 
-	// 对 ObjectFile::Symbols 初始化
+	// 创建 ObjectFile::Symbols 并初始化
+	o.Symbols = make([]*Symbol, len(o.ElfSyms))
 	// ObjectFile::Symbols 由两部分组成，
 	// 一部分是 LOCAL 符号，所以直接指向 ObjectFile::LocalSymbols 的成员
-	o.Symbols = make([]*Symbol, len(o.ElfSyms))
 	for i := 0; i < len(o.LocalSymbols); i++ {
 		o.Symbols[i] = &o.LocalSymbols[i]
 	}
@@ -198,15 +202,19 @@ func (o *ObjectFile) GetShndx(esym *Sym, idx int) int64 {
 }
 
 func (o *ObjectFile) ResolveSymbols() {
+	// 
 	for i := o.FirstGlobal; i < len(o.ElfSyms); i++ {
 		sym := o.Symbols[i]
 		esym := &o.ElfSyms[i]
 
+		// 如果这个符号不是自身 obj 定义的，则略过
 		if esym.IsUndef() {
 			continue
 		}
 
 		var isec *InputSection
+		// 对于不是 ABS 的符号，尝试获取该符号所在的 section
+		// 此时该符号差不多就是本地定义的 GLOBAL 符号了
 		if !esym.IsAbs() {
 			isec = o.GetSection(esym, i)
 			if isec == nil {
@@ -214,6 +222,7 @@ func (o *ObjectFile) ResolveSymbols() {
 			}
 		}
 
+		// 如果这个本地的符号还没有 resolve，则 resolve
 		if sym.File == nil {
 			sym.File = o
 			sym.SetInputSection(isec)
@@ -227,6 +236,9 @@ func (o *ObjectFile) GetSection(esym *Sym, idx int) *InputSection {
 	return o.Sections[o.GetShndx(esym, idx)]
 }
 
+// 判断一个 obj 中是否存在 UDEF 的符号
+// 如果存在并且定义这个符号的外部 obj 没有被标识为 alive 则标识之，同时将这个 obj
+// 文件也加入 roots
 func (o *ObjectFile) MarkLiveObjects(feeder func(*ObjectFile)) {
 	utils.Assert(o.IsAlive)
 
@@ -234,10 +246,14 @@ func (o *ObjectFile) MarkLiveObjects(feeder func(*ObjectFile)) {
 		sym := o.Symbols[i]
 		esym := &o.ElfSyms[i]
 
+		// FIXME：没有看懂，感觉此类符号就直接跳过了
+		// UNDEF 的 GLOBAL 符号难道此时的 File 成员不为 nil?
 		if sym.File == nil {
 			continue
 		}
 
+		// 如果某个符号是 UNDEF，说明这个符号定义在外部 obj 中
+		// 则我们需要将这个外部的 obj 文件也标记为 Alive
 		if esym.IsUndef() && !sym.File.IsAlive {
 			sym.File.IsAlive = true
 			feeder(sym.File)
@@ -245,6 +261,9 @@ func (o *ObjectFile) MarkLiveObjects(feeder func(*ObjectFile)) {
 	}
 }
 
+// 针对一个 obj 文件中的所有 GLOBAL 符号
+// 如果这个符号是定义在本地 module 中的，则执行 Symbol::Clear
+// FIXME: 什么目的啊？
 func (o *ObjectFile) ClearSymbols() {
 	for _, sym := range o.Symbols[o.FirstGlobal:] {
 		if sym.File == o {

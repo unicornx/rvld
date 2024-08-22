@@ -39,6 +39,7 @@ func main() {
 
 	// 从命令行中根据 .o 或者 .a 将 obj 文件转化为 ObjectFile 并添加到 Context::Objs 容器中
 	linker.ReadInputFiles(ctx, remaining)
+	// 这里调用的是 pkg/linker/passes.go 中的 ResolveSymbols 函数
 	linker.ResolveSymbols(ctx)
 	linker.RegisterSectionPieces(ctx)
 	linker.ComputeMergedSectionSizes(ctx)

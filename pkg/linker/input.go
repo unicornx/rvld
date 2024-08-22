@@ -42,7 +42,8 @@ func CreateObjectFile(ctx *Context, file *File, inLib bool) *ObjectFile {
 	// 对 FileTypeArchive 中的 .o 默认 alive 为 false
 	// alive 说明需要加入最终的 output
 	obj := NewObjectFile(file, !inLib)
-	// 
+	// 对这个 object file 进行解析，为后面的处理做准备
+	// 这个 Parse 函数里面展开有很多工作，需要仔细看。
 	obj.Parse(ctx)
 	return obj
 }
