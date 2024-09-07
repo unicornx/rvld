@@ -5,6 +5,10 @@ import (
 	"os"
 )
 
+// Name: 文件的 name
+// Contents：文件的 rawdata
+// Parent：当一个 obj 文件归属于一个 archive 文件时，这个 Parent 会指向 archive 文件
+//         FIXME：但只看到赋值，没有看到使用的地方。
 type File struct {
 	Name     string
 	Contents []byte

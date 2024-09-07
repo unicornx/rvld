@@ -13,18 +13,22 @@ import (
  *
  * @SymtabSec：一个指向符号表所对应的 ELF Section 的指针
  *
- * @SymtabShndxSec: 背景知识，和 SHT_SYMTAB_SHNDX 有关
+ * @SymtabShndxSec: 一个 32 位整数的数组
+ *  背景知识，和 SHT_SYMTAB_SHNDX secion 有关
  *  符号表的每一项 Elf_Sym 中有个字段 st_shndx (符号所在 section 的 index)
  *  正常情况下，当一个符号定义在本 obj 文件中，则该值就是符号所在 section 的 index
  *  其他情况会有特殊值：譬如 SHN_ABS/SHN_UNDEF/... 具体参考 cxyxy
  *  但是 cxyxy 中没有提到一个 SHN_XINDEX， 如果是这个值，则说明当前 obj 文件的
  *  符号表 section 还对应一个 type 为 SHT_SYMTAB_SHNDX 的 section。这个 section 由
- *  一个 Elf32_Word 的数组组成，数组的个数和该 obj 文件的符号表的 entry 相同。
+ *  一个 Elf32_Word 的数组组成，数组的个数和该 obj 文件的符号表的 entry 相同。即
+ *  假设本 obj 文件涉及了 100 个符号，那么 SHT_SYMTAB_SHNDX section 的数组就有至多 100
+ *  项，可能少于100，因为有些符号可能不是 local 的。
  *  主要是用于扩展，因为原来的 st_shndx 的类型是 Elf32_Half, 即 16 bit 宽，如果
- *  section 个数很多，则不够，需要用 32 位的扩展。
- *  也就是说当符号表的项目个数很多，超出 Elf32_Half 能够表达的范围时，Elf_Sym 中
+ *  section 个数很多（超过 65535），则不够，需要用 32 位的扩展。
+ *  也就是说当 section 个数很多，超出 Elf32_Half 能够表达的范围时，Elf_Sym 中
  *  的字段 st_shndx 就为 SHN_XINDEX，此时这个符号所在的 section 的 index 值我们就
- *  需要到一个特殊的 section，即 type 为 SHT_SYMTAB_SHNDX 的 section 中去查找。
+ *  需要到一个特殊的 section，即 type 为 SHT_SYMTAB_SHNDX 的 section 中去查找。对应
+ *  数组下标和符号表的下标一致。
  *
  * @Sections: 是一个 InputSection 的指针数组。
  *            与 obj 文件中 Elf section 一一对应的 InputSection，方便 linker 内部处理
@@ -42,7 +46,7 @@ import (
  *                     这个数组中，注意这个数组的个数和 ObjectFile::Sections 是一样的，
  *                     但是并不是每个 InputSection 都是 mergeable 的，所以 
  *                     ObjectFile::MergeableSections 中的有效数据小于 ObjectFile::Sections
- *                     的有效数据，注意到数组的成员是指针。
+ *                     的有效数据，所以这里 MergeableSections 数组的成员类型也是指针。
  */
 type ObjectFile struct {
 	InputFile
@@ -55,6 +59,12 @@ type ObjectFile struct {
 // 在 InputFile 基础上
 // 仅仅多了初始化一个 IsAlive 成员
 func NewObjectFile(file *File, isAlive bool) *ObjectFile {
+	// 这个貌似是 go 的语法
+	// NewInputFile() 这个函数，接受一个 *File 指针类型，这个函数会
+	// 在堆上 new 一个 InputFile 类型的对象出来，
+	// 然后赋值给 ObjectFile 的 InputFile 成员
+	// 这样就完成了基类的创建。
+	// 而 o 得到的是 ObjectFile 的地址，也就是说 o 是一个 ObjectFile 的指针类型
 	o := &ObjectFile{InputFile: NewInputFile(file)}
 	o.IsAlive = isAlive
 	return o

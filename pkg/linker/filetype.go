@@ -15,6 +15,11 @@ const (
 	FileTypeArchive FileType = iota
 )
 
+// 根据文件内容获得文件的类型：
+// FileTypeObject：文件开头的 Magic Code 符合 ELF
+// FileTypeArchive
+// FileTypeUnknown
+// FileTypeEmpty
 func GetFileType(contents []byte) FileType {
 	if len(contents) == 0 {
 		return FileTypeEmpty

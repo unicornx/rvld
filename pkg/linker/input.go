@@ -2,8 +2,15 @@ package linker
 
 import "github.com/ksco/rvld/pkg/utils"
 
+// -> ReadInputFiles
+//    -> ReadFile
+//       -> CreateObjectFile
+//          -> Parse
+
+
 // 遍历并处理命令行中 remaining 的部分，也就是除去 option 选项后剩下的部分，主要是
 // .o 文件或者 -lxx（archive 文件）
+// 具体处理交给 ReadFile
 // 对于 .o 文件，直接处理后转化为 ObjectFile 类型并加入 Context::Objs 中
 // 对于 archive 文件，提取出其中的 .o 文件后同样转化为 ObjectFile 类型并加入 Context::Objs 中
 func ReadInputFiles(ctx *Context, remaining []string) {
@@ -33,6 +40,11 @@ func ReadFile(ctx *Context, file *File) {
 	}
 }
 
+
+// 大量的处理实际上都在 CreateObjectFile 内部发生
+// 这也是无论 object 文件或者 archive 文件最终也是 extract 处 object 文件然后由
+// 该函数处理之
+// Parse 文件
 func CreateObjectFile(ctx *Context, file *File, inLib bool) *ObjectFile {
 	// 确保打开的是 RISCV 文件
 	CheckFileCompatibility(ctx, file)
