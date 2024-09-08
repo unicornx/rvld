@@ -49,11 +49,18 @@ import (
  *                     的有效数据，所以这里 MergeableSections 数组的成员类型也是指针。
  */
 type ObjectFile struct {
+	/*
+	 * SymtabSec 和 SymtabShndxSec 我理解还是 ELF 范畴的
+	 * Sections 和 MergeableSections 是 linker 自身范畴的
+	 * FIXME: InputFile 和 ObjectFile 的界限在哪里？感觉这里分得不是很
+	 * 清楚。我的想法是 ELF 范畴的应该都划归到 InputFile 中去处理，Linker
+	 * 范畴的划归 ObjectFile 中去处理。这里感觉有点乱。
+	 */
 	InputFile
-	SymtabSec         *Shdr        // 由 ObjectFile::Parse 解析获取
-	SymtabShndxSec    []uint32
-	Sections          []*InputSection
-	MergeableSections []*MergeableSection
+	SymtabSec         *Shdr			// 由 ObjectFile::Parse 解析获取
+	SymtabShndxSec    []uint32		// 由 ObjectFile::InitializeSections 解析获取
+	Sections          []*InputSection	// 由 ObjectFile::InitializeSections 解析获取
+	MergeableSections []*MergeableSection	// 由 ObjectFile::InitializeMergeableSections 解析获取
 }
 
 // 在 InputFile 基础上
@@ -96,7 +103,7 @@ func (o *ObjectFile) Parse(ctx *Context) {
 	// 根据对应 obj 文件中的 ELF section 初始化 ObjectFile::Sections
 	o.InitializeSections(ctx)
 
-	// 解析文件的符号，初始化 ObjectFile::Symbols。
+	// 解析文件的符号，初始化 InputFile::Symbols。
 	// LOCAL 符号放在 ObjectFile 中保存，GLOBAL 符号放在 Context 中保存
 	o.InitializeSymbols(ctx)
 
@@ -211,8 +218,10 @@ func (o *ObjectFile) GetShndx(esym *Sym, idx int) int64 {
 	return int64(esym.Shndx)
 }
 
+// 将本 obj 文件中自己定义的符号解析掉。
+// 但此时还处理不了引用的外部符号，即那些 UNDEF 的符号
 func (o *ObjectFile) ResolveSymbols() {
-	// 
+	// Local 符号不需要 resolve，只处理 Global 符号
 	for i := o.FirstGlobal; i < len(o.ElfSyms); i++ {
 		sym := o.Symbols[i]
 		esym := &o.ElfSyms[i]

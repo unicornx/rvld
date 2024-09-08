@@ -11,6 +11,9 @@ func ResolveSymbols(ctx *Context) {
 	// 遍历上下文中的 Objs，也就是命令行里输入的所有 obj 文件，
 	// 对每个 obj 文件调用 ObjectFile::ResolveSymbols
 	// 这里能够 resolve 的都是定义在本地 obj/模块中的 GLOBAL 符号
+	// 也就是经过这一次遍历，将输入的 obj 文件中符号表中引用的
+	// 本地自己定义的符号都 resolve 了
+	// 那么 obj 文件中符号表中未决的符号都是定义在本模块以外的了
 	for _, file := range ctx.Objs {
 		file.ResolveSymbols()
 	}
@@ -41,8 +44,25 @@ func MarkLiveObjects(ctx *Context) {
 	// obj 文件，则会继续入队。
 	// 这么做的结果就是，会像一个链条一样，将所有依赖的 obj 文件都查找并标识
 	// 出来。
+	// 举个例子：假设我们编写的项目有1个文件 a.o
+	// a.o 中引用了外部符号 s1，s2。
+	// libX.a 中有 1.o (定义了 s1), 2.o（定义了 s2，引用外部 s3） 和 3.o（定义了 s3），4.o(定义了 s4)
+	// a.o (s1  s2)
+	//      |    |
+	//      V    V
+	//      1.o  2.o (s3)
+	//                 |
+	//                 V
+	//                 3.o
+	// roots 的变化规律如下：
+	// roots = {a.o}
+	// roots = {1.o, 2.o} // 处理完 a.o 被移除
+	// roots = {2.o} // 处理完 1.o 被移除
+	// roots = {3.o} // 处理完 2.o 被移除
+	// roots = {} // 处理完 3.o 被移除
 	roots := make([]*ObjectFile, 0)
 	
+	// 初始化 roots
 	// 遍历上下文中的 Objs，如果这个文件被标记为 Alive 则说明需要执行符号解析
 	// 即这个 obj 文件中存在未解析的 GLOBAL 符号
 	// 将该文件加入 roots 数组中等待后继继续处理

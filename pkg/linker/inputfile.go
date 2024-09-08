@@ -10,17 +10,28 @@ import (
  * @File
  * @ElfSections: Shdr（ELF Section header）的数组
  * @ShStrtab: Section Header 字符串的 rawdata，本质上是一个 byte 数组，内部字符串以 '\0' 结尾
+ *
+ * ELF 符号表相关，在 ObjectFile::Parse 中获取
  * @ElfSyms: ELF 符号表。是 Sym（ELF Symbol）类型的数组
  * @FirstGlobal: ELF 符号表中第一个 Global 符号的位置
  * @SymbolStrtab: ELF 符号表字符串的 rawdata，其实就是对应的 .strtab section
- * @IsAlive: 标记该文件是否最终要输出到 Output
+
+ * @IsAlive: 标记该文件是否最终要输出到 Output, 和 MarkLiveObjects 有关
+ *
+ * 用于 linker 的符号表相关，在 ObjectFile::InitializeSymbols 中获取
+ * ObjectFile::Parse -> ObjectFile::InitializeSymbols
+ * 注意这里的 Symbols 和上面 ElfSyms 的区别
  * @Symbols: 一个 InputFile（这里主要是指 ObjectFile）文件中所有的符号，
  *           包括 LOCAL 和 GLOBAL，经过解析处理后，具体参考 ObjectFile::InitializeSymbols
  *           实际的 LOCAL 符号对象放在 InputFile::LocalSymbols 中
  *           实际的 GLOBAL 符号对象放在 Context::SymbolMap 中
  *           所以这里 Symbols 数组成员类型是 Symbol*，指针指向实际的 Symbol 对象
  *           注意 Symbol 和 Sym 不同，Sym 是 ELF 的概念， Symbol 是 Linker 的概念
- * @LocalSymbols: 该文件的 LOCAL 符号，存放形式是一个 Symbol 的数组
+ *	     注意 Symbols 和 ElfSyms 都是数组的形式，而且是一一对应的。所以我们可以用
+ *           统一的下标 index 索引它们，范围是从 [o.FirstGlobal, len(o.ElfSyms)]
+ * @LocalSymbols: 该文件的 LOCAL 符号，存放形式是一个 Symbol 的数组，LocalSymbols 数组的
+ *           个数是 InputFile::FirstGlobal。所以我们同样可以用
+ *           统一的下标 index 索引它们，范围是从 [0, o.FirstGlobal]
  */
 type InputFile struct {
 	File         *File  // 由 NewInputFile 解析获取
@@ -30,8 +41,8 @@ type InputFile struct {
 	FirstGlobal  int    // 由 ObjectFile::Parse 解析获取
 	SymbolStrtab []byte // 由 ObjectFile::Parse 解析获取
 	IsAlive      bool   // 由 NewObjectFile 解析获取
-	Symbols      []*Symbol
-	LocalSymbols []Symbol
+	Symbols      []*Symbol // ObjectFile::InitializeSymbols
+	LocalSymbols []Symbol  // ObjectFile::InitializeSymbols
 }
 
 // 创建 InputFile 对象,初始化后返回这个对象的引用（注意不是指针）

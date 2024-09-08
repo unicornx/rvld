@@ -14,7 +14,7 @@ const (
  * @Value: Elf_Sym::st_value
  * @SymIdx: 符号在符号表中的index
  *
- * @InputSection: 符号所在的 Input section
+ * @InputSection: 符号所对应的 InputSection（linker 域）
  * @SectionFragment: 
  */
 type Symbol struct {
