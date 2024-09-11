@@ -218,10 +218,34 @@ func (o *ObjectFile) GetShndx(esym *Sym, idx int) int64 {
 	return int64(esym.Shndx)
 }
 
-// 将本 obj 文件中自己定义的符号解析掉。
-// 但此时还处理不了引用的外部符号，即那些 UNDEF 的符号
+/*
+```c
+static void foo()
+{
+        printf("local");
+}
+
+int main()
+{
+        printf("hello");
+        return 0;
+}
+```
+
+Symbol table '.symtab' contains 7 entries:
+   Num:    Value          Size Type    Bind   Vis      Ndx Name
+     0: 0000000000000000     0 NOTYPE  LOCAL  DEFAULT  UND 
+     1: 0000000000000000     0 FILE    LOCAL  DEFAULT  ABS hello.c
+     2: 0000000000000000     0 SECTION LOCAL  DEFAULT    1 .text
+     3: 0000000000000000     0 SECTION LOCAL  DEFAULT    5 .rodata
+     4: 0000000000000000    31 FUNC    LOCAL  DEFAULT    1 foo
+     5: 0000000000000000     0 NOTYPE  GLOBAL DEFAULT  UND printf
+     6: 000000000000001f    35 FUNC    GLOBAL DEFAULT    1 main
+*/
+
+// 本质上就是找本module定义的 GLOBAL 符号
 func (o *ObjectFile) ResolveSymbols() {
-	// Local 符号不需要 resolve，只处理 Global 符号
+	// LOCAL 符号不需要 resolve，只处理 GLOBAL 符号
 	for i := o.FirstGlobal; i < len(o.ElfSyms); i++ {
 		sym := o.Symbols[i]
 		esym := &o.ElfSyms[i]
@@ -255,9 +279,9 @@ func (o *ObjectFile) GetSection(esym *Sym, idx int) *InputSection {
 	return o.Sections[o.GetShndx(esym, idx)]
 }
 
-// 判断一个 obj 中是否存在 UDEF 的符号
+// 判断一个 obj 中是否存在 UDEF 的 GLOBAL 符号引用
 // 如果存在并且定义这个符号的外部 obj 没有被标识为 alive 则标识之，同时将这个 obj
-// 文件也加入 roots
+// 文件也加入 roots（通过 feeder 这个回调函数）
 func (o *ObjectFile) MarkLiveObjects(feeder func(*ObjectFile)) {
 	utils.Assert(o.IsAlive)
 
@@ -281,8 +305,10 @@ func (o *ObjectFile) MarkLiveObjects(feeder func(*ObjectFile)) {
 }
 
 // 针对一个 obj 文件中的所有 GLOBAL 符号
-// 如果这个符号是定义在本地 module 中的，则执行 Symbol::Clear
-// FIXME: 什么目的啊？
+// 如果这个符号引用所对应的符号定义在本地 module 中的，则执行 Symbol::Clear
+//
+// 总而言之，我们的目的是清理掉那些我们不关心的 obj 文件定义的符号就对了
+// 感觉这个函数应该定义在 Context 中，go 语言这里很让人迷惑，实际上是操作的 Symbol 指针，而指针在 Context 的 SymbolMap 中
 func (o *ObjectFile) ClearSymbols() {
 	for _, sym := range o.Symbols[o.FirstGlobal:] {
 		if sym.File == o {

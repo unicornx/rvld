@@ -30,13 +30,16 @@ type ContextArgs struct {
  * @SymbolMap: 所有输入文件的 GLOBAL 符号。
  *             这些符号的添加动作参考 GetSymbolByName() 函数
  *             在遍历所有输入的 obj 文件的过程中，会触发该函数
-  *                  main
+ *                  main
  *                  -> ReadInputFiles
  *                     -> ReadFile
  *                        -> CreateObjectFile
  *                           -> Parse
  *                              -> InitializeSymbols
  *                                 -> GetSymbolByName
+ *  此外，还值得注意的是：
+ *  整个链接过程中涉及的 GLOBAL 符号的对象实体实际上都存放在 Context::SymbolMap 中
+ *  每个 ObjectFile::Symbols 成员是 Symbl 指针类型，都是指向整个 map。
  * @MergedSections: 用于保存 Merged 的 Sections
  *                  有关 Merged Section 的概念和 section header entry 中的 SHF_MERGE 的有关，
  *                  参考 https://refspecs.linuxbase.org/elf/gabi4+/ch4.sheader.html

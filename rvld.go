@@ -38,9 +38,21 @@ func main() {
 	}
 
 	// 从命令行中根据 .o 或者 .a 将 obj 文件转化为 ObjectFile 并添加到 Context::Objs 容器中
+	// 并且这里所有的符号也创建好了
+	// LOCAL 符号对象放在 InputFile::LocalSymbols 中
+ 	// GLOBAL 符号对象放在 Context::SymbolMap 中
+	// 每个 ObjectFile::Symbols 以指针形式指向这些符号对象
+	// LOCAL 符号在这里实际上已经 resolve 了，见 ObjectFile::InitializeSymbols
+	// GLOBAL 符号此时还没有 resolve
 	linker.ReadInputFiles(ctx, remaining)
+	
 	// 这里调用的是 pkg/linker/passes.go 中的 ResolveSymbols 函数
+	// 这一步做完后所有的符号，包括 LOCAL 和 GLOBAL 的符号的符号引用都 resolve 完毕
+	// 同时这一步中也完成了 MarkLiveObjects 的操作，即所有需要链接的 obj 文件都被标识出来
+	// FIXME：感觉 MarkLiveObjects 可以独立出来作为单独的一步会比较清楚。
 	linker.ResolveSymbols(ctx)
+
+	
 	linker.RegisterSectionPieces(ctx)
 	linker.ComputeMergedSectionSizes(ctx)
 	linker.CreateSyntheticSections(ctx)

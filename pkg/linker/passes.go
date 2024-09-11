@@ -10,25 +10,34 @@ import (
 func ResolveSymbols(ctx *Context) {
 	// 遍历上下文中的 Objs，也就是命令行里输入的所有 obj 文件，
 	// 对每个 obj 文件调用 ObjectFile::ResolveSymbols
-	// 这里能够 resolve 的都是定义在本地 obj/模块中的 GLOBAL 符号
-	// 也就是经过这一次遍历，将输入的 obj 文件中符号表中引用的
-	// 本地自己定义的符号都 resolve 了
-	// 那么 obj 文件中符号表中未决的符号都是定义在本模块以外的了
+	// 这里是要 resolve 所有 Bind == GLOBAL 的符号
+	// 本质上就是要找到定义这些符号的 module
+	// 也就是遍历所有的 module，看这些 module 自己定义了哪些 GLOBAL 符号
+	// 参考 ObjectFile::ResolveSymbols()
+	// 注意更新的结果体现在 Context::SymbolMap 中
 	for _, file := range ctx.Objs {
 		file.ResolveSymbols()
 	}
 
-	// 将所有存在未决 GLOBAL 符号的 obj 全部标识出来，即设置 InputFile::IsAlive 为 true
+	// 这里是调用 passes::MarkLiveObjects()
+	// 将所有存在未决 GLOBAL 符号的 obj 全部标识出来，标识的方法是 InputFile::IsAlive 为 true
+	// FIXME：我觉得 MarkLiveObjects 这一步其实已经不算是 ResloveSymbols 了
+	// 下面三步可以提出来作为一个单独的 Mark Live
 	MarkLiveObjects(ctx)
 
 	// 遍历所有输入的 obj 文件，如果这个文件不需要参与解析的，则做一遍清理
-	// FIXME：目的何在？
+	// 清理，后面这些 not alive 的 objfile 对象都会被从 Context::Objs 中移除了。
+	// 具体看 ObjectFile::ClearSymbols()
+	// 实际上这里的目的是把 non-alive 的也就是我们不关心的 obj 文件定义的
+	// 符号清空，最终影响的是 Context::SymbolMap
+	// FIXME 这里的代码容易让人迷惑。最好做成 Context 的行为。
 	for _, file := range ctx.Objs {
 		if !file.IsAlive {
 			file.ClearSymbols()
 		}
 	}
 
+	// RemoveIf 定义在 utils.go，就是缩减数组
 	ctx.Objs = utils.RemoveIf[*ObjectFile](ctx.Objs, func(file *ObjectFile) bool {
 		return !file.IsAlive
 	})
@@ -64,7 +73,7 @@ func MarkLiveObjects(ctx *Context) {
 	
 	// 初始化 roots
 	// 遍历上下文中的 Objs，如果这个文件被标记为 Alive 则说明需要执行符号解析
-	// 即这个 obj 文件中存在未解析的 GLOBAL 符号
+	// 即这个 obj 文件中存在未解析的 GLOBAL 符号引用
 	// 将该文件加入 roots 数组中等待后继继续处理
 	for _, file := range ctx.Objs {
 		if file.IsAlive {
@@ -93,13 +102,14 @@ func MarkLiveObjects(ctx *Context) {
 		// func(file *ObjectFile) {
 		//	roots = append(roots, file)
 		// }
-		// FIXME: 我现在的理解是会将 file 中含有 UNDEF 的 GLOBAL 符号
-		// 的 obj 文件也加入 roots。
-		// 这些 obj 可能是譬如来自 archive 文件中的 obj
+		// 我现在的理解是会将被别的 obj file 依赖的 obj file 也加入 roots。
+		// 这些 obj 主要指来自 archive 文件中的 obj。
 		file.MarkLiveObjects(func(file *ObjectFile) {
 			roots = append(roots, file)
 		})
 
+		// 当前队列中的第一个 obj 文件处理完毕
+		// 出队
 		// roots 数组缩小一个，roots 的第一个元素被移除
 		roots = roots[1:]
 	}
