@@ -15,7 +15,15 @@ const (
  * @SymIdx: 符号在符号表中的index
  *
  * @InputSection: 符号所对应的 InputSection（linker 域）
- * @SectionFragment: 
+ * @SectionFragment: 符号也可能属于一个 MergableSection中的 SectionFragment
+ *                   具体的例子按照课程视频的说明，假如代码中一个字符串也可能
+ *                   会对应到一个符号。FIXME， 具体例子还要看看
+ * 上面两个属性同时只有一个为 !nul
+ * 这个设计和处理 mergable section 有关
+ * 因为根据课程的设计，如果一个 InputSection 是 mergable 的，那么它会被
+ * 转化为一个 MergeableSection，而原来的 InputSection 经转化后就无效了
+ * FIXME 这个设计其实有点不好理解，其实 MergeableSection 似乎也应该是一个 InputSection
+ * 但现在的设计似乎把两者对立起来了。
  */
 type Symbol struct {
 	File     *ObjectFile
@@ -38,11 +46,13 @@ func NewSymbol(name string) *Symbol {
 	return s
 }
 
+// 如果一个 Symbol 属于一个 InputSection
 func (s *Symbol) SetInputSection(isec *InputSection) {
 	s.InputSection = isec
 	s.SectionFragment = nil
 }
 
+// 如果一个 Symbol 属于一个 SectionFragment
 func (s *Symbol) SetSectionFragment(frag *SectionFragment) {
 	s.InputSection = nil
 	s.SectionFragment = frag

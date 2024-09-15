@@ -6,12 +6,6 @@ import (
 	"sort"
 )
 
-/*
- * 见 
- * - https://docs.oracle.com/en/operating-systems/solaris/oracle-solaris/11.4/linkers-libraries/section-merging.html
- * - https://blog.csdn.net/qq_42570601/article/details/124695589 Elf_Shdr::sh_flag 取值为 SHF_XXX
- * 
- */
 type MergedSection struct {
 	Chunk
 	Map map[string]*SectionFragment
@@ -30,16 +24,24 @@ func NewMergedSection(
 	return m
 }
 
+// Context::MergedSections 保存了所有处理过后的 merged section
+// 在处理 merged section 时我们需要合并，合并的原理就是如果一个同一类的 merged section
+// 已经创建过，我们只要做 merge，而不是再建一个。
+// 所谓同一类，就是根据 section 的 name/flags/type 都相同
+
+// FIXME 这个函数是不是应该放到 Context 里去呢？
 func GetMergedSectionInstance(
 	ctx *Context, name string, typ uint32, flags uint64) *MergedSection {
 	name = GetOutputName(name, flags)
 	
-	// FIXME: SHF_MERGE 与 SHF_STRINGS 或许尚可理解
-	// 但是为何要扯上 SHF_GROUP 和 SHF_COMPRESSED？
+	// 这里是把我们不希望处理的 flags 的 bit 位清除掉
+	// 保证我们最终输出的 section 的 flags 里不会含有这些不应该出现的 bit 位。
 	flags = flags & ^uint64(elf.SHF_GROUP) & ^uint64(elf.SHF_MERGE) &
 		^uint64(elf.SHF_STRINGS) & ^uint64(elf.SHF_COMPRESSED)
 
-	// 根据 name、flags 和 type 三个属性寻找相同的 merged section
+	// 一个本地定义的函数：
+	// 根据 name、flags 和 type 三个属性去 Context 中寻找相同的 merged section
+	// 找不到就返回 nil
 	find := func() *MergedSection {
 		for _, osec := range ctx.MergedSections {
 			if name == osec.Name && flags == osec.Shdr.Flags &&
@@ -70,6 +72,7 @@ func (m *MergedSection) Insert(
 		m.Map[key] = frag
 	}
 
+	// 确保 merge 后的 section，对齐标准要按照最大的那个对齐。
 	if frag.P2Align < p2align {
 		frag.P2Align = p2align
 	}

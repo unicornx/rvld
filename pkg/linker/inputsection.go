@@ -13,12 +13,18 @@ import (
  * @File: 含有该 section 的 ObjectFile 对象
  * @Contents: 该 section 的 rawdata
  * @Shndx: 该 section 在 section header table 中的 index
- * @ShSize: 该 section rawdata 的 size
- * @IsAlive: FIXME：这个和 Inputfile 中的 IsAlive 有何区别？
+ * @ShSize: 该 section rawdata 的 size，虽然一个 inputsection 对应一个 elf section
+ *          但是最终的 InputSection 的 size 会被改动，所以另外定一个 Inputsection 自己的 size 成员。
+ * @IsAlive: Section 级别的 isAlive 标记，而 InputFile::IsAlive 是文件级别的 isAlive 标记
+ *           需要找个属性的原因是，即使一个文件是 isAlive 的（需要输出到 output 文件中），
+ *           但并不意味着找个文件中所有的 section 都需要输出到 output 文件中。
+ *           FIXME：
  *           标识这个 mergebale 的 InputSection 是否已经被 split 处理过？
  *           参考 InitializeMergeableSections()
  *           标识这个 input section 是 ".eh_frame" 的
- * @P2Align: Elf_hdr::sh_addralign 表示地址对齐的 2 的指数值。譬如 2 表示 2^2=4 字节对齐，3 表示 2^3=8 字节对齐
+ * @P2Align: Elf_hdr::sh_addralign 中存放的表示地址对齐的 2 的指数值。
+ *           P2Align 则将其转化为指数值，譬如 sh_addralign = 4 时对应的 P2Align 为 2
+ *           sh_addralign = 8 时对应的 P2Align 为 3
  * @Offset:
  * @OutputSection: 该 input section 对应的 output section
  * @RelsecIdx: 对于类型为 SHT_RELA 的 section（重定位表），这个属性存放了该重定位
@@ -45,17 +51,19 @@ func NewInputSection(ctx *Context, name string, file *ObjectFile, shndx uint32) 
 	s := &InputSection{
 		File:      file, // InputSection::File
 		Shndx:     shndx,// InputSection::Shndx
-		IsAlive:   true, // 注意这里 InputSection::IsAlive 默认为 true
+		IsAlive:   true, // 注意这里 InputSection::IsAlive 默认为 true，后面判断不需要输出时再标记为 false
 		Offset:    math.MaxUint32,
 		RelsecIdx: math.MaxUint32,
 		ShSize:    math.MaxUint32,
 	}
 
 	// 填写 InputSection::Contexts 的内容，以备后面使用
+	// 找到这个 InputSection 对应的 ELf section header
 	shdr := s.Shdr()
 	s.Contents = file.File.Contents[shdr.Offset : shdr.Offset+shdr.Size]
 
 	// InputSection::ShSize， 这个和 InputSection::Contexts 是配套使用的
+	// 课程中暂不支持压缩的方式，所以这里只是 assert 一下。
 	utils.Assert(shdr.Flags&uint64(elf.SHF_COMPRESSED) == 0)
 	s.ShSize = uint32(shdr.Size)
 

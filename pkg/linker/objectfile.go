@@ -40,10 +40,11 @@ import (
  *            创建对应的 InputSection，那么 ObjectFile::Sections[] 中对应的项只会
  *            占用一个指针的大小，不会浪费内存
  *
- * @MergeableSections：每个 mergeable 的 InputSection 都对应有一个经过 split 处理
- *                     后的 MergeableSections 对象
- *                     这些 MergeableSections 的对象存放在 ObjectFile::MergeableSections 
- *                     这个数组中，注意这个数组的个数和 ObjectFile::Sections 是一样的，
+ * @MergeableSections：每个标记为 mergeable 的 InputSection 会转化为一个 MergeableSection，关系是一一对应
+ *                     这个 MergeableSection 经过 split 处理后被分割
+ *                     所有的 mergeable 的 InputSection 被转化后统一放在一个数组中，这个数组就是 MergeableSections 对象
+ *                     
+ *                     注意这个数组的个数和 ObjectFile::Sections 是一样的，
  *                     但是并不是每个 InputSection 都是 mergeable 的，所以 
  *                     ObjectFile::MergeableSections 中的有效数据小于 ObjectFile::Sections
  *                     的有效数据，所以这里 MergeableSections 数组的成员类型也是指针。
@@ -325,8 +326,7 @@ func (o *ObjectFile) ClearSymbols() {
 //
 // 具体的处理由 splitSection 完成，也就是将 section中的元素分割开，便于后继处理
 // 注意分割处理后 isec.IsAlive 就从 true 变为 false
-// FIXME：所以我现在理解这里 IsAlive 的作用就是用于标识这个 mergebale 的 InputSection
-// 是否已经被 split 处理过？
+// FIXME：所以我现在理解这里之所以 
 func (o *ObjectFile) InitializeMergeableSections(ctx *Context) {
 	o.MergeableSections = make([]*MergeableSection, len(o.Sections))
 	for i := 0; i < len(o.Sections); i++ {
@@ -354,23 +354,36 @@ func findNull(data []byte, entSize int) int {
 	return -1
 }
 
-// 这个函数的作用是将 mergeable 的 section 的 rawdata 分割成元素，存放在返回的
+// 这个函数的作用是：
+// 首先对输入的具备 SHF_MERGE 的 InputSection 对应创建一个 MergeableSection
+// 然后将的 section 的 rawdata 分割成元素，存放在返回的
 // MergeableSection 对象中
-// 根据 Merged Section 的概念，参考 pkg/linker/context.go 中对 Context::MergedSections
-// 的说明，元素分为两种类型
+// 值得注意的是，这里分割的结果，只是把分割后的元素存放在
+// MergeableSection::Strs（存放分割后的内容）
+// 和
+// MergeableSection::FragOffsets（存放分割后的偏移量）
+// 并没有放到 MergeableSection::Fragments 中去
+// 最终放到 MergeableSection::Fragments 中的动作是由 RegisterSectionPieces 完成。Why FIXME
+//
+// 另外，注意根据 Mergable Section 的概念, 其中元素分为两种类型，所以 split 的方式也分为两种
 func splitSection(ctx *Context, isec *InputSection) *MergeableSection {
 	m := &MergeableSection{}
 	shdr := isec.Shdr()
 
 	// 从 Context 中获取 merged section
+	// 每个 name/flags/types 三元组相同的 MergeableSection 最终都会被 merge 
+	// 到一个 MergedSection 中去
+	// 所以这里就是在找对应的 MergedSection
 	m.Parent = GetMergedSectionInstance(ctx, isec.Name(), shdr.Type,
 		shdr.Flags)
 	m.P2Align = isec.P2Align
 
+	// 下面开始 split
 	data := isec.Contents
 	offset := uint64(0)
 	if shdr.Flags&uint64(elf.SHF_STRINGS) != 0 {
-		// 元素第一种类型为 string 类型，元素之间以 '\0' 分割
+		// 该 mergeable section 中的元素类型为 string 类型，元素之间以 '\0' 分割
+		// 
 		for len(data) > 0 {
 			end := findNull(data, int(shdr.EntSize))
 			if end == -1 {
