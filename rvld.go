@@ -52,38 +52,65 @@ func main() {
 	// FIXME：感觉 MarkLiveObjects 可以独立出来作为单独的一步会比较清楚。
 	linker.ResolveSymbols(ctx)
 
-	
+	// merge section 相关处理
+	// 对每个 obj 文件遍历一遍，将这些 obj 文件中的 mergeable 的 section 中的
+	// 重复的 fragment 找出来放到 merged section 中。
+	// FIXME：RegisterSectionPieces 中还有一段对符号进行去重的操作，没看懂，TBD
 	linker.RegisterSectionPieces(ctx)
 
+	// merge section 相关处理
+	// 为 merged section 计算对应的 phdr 的 size 以及 align 信息。
 	linker.ComputeMergedSectionSizes(ctx)
+	// FIXME: 感觉上面两个 RegisterSectionPieces 和 ComputeMergedSectionSizes
+	// 如果都是和 merged section 相关的处理，应该放在一个函数中作为一个大的 step
 
+	// Synthetic：合成的
+	// 其实就是对 Context 中的 Chunks 进行初始化，
+	// Output 中有四大块：
+	// Ehdr/Phdr/Shdr/GotSection
 	linker.CreateSyntheticSections(ctx)
 
+	// 对 Context::OutputSections 进行预处理
 	linker.BinSections(ctx)
 
+	// 我目前的理解这里是为 output 文件中的 section 部分做准备
+	// 收集的 outputsection 来自两部分
+	// - Context::OutputSections
+	// - Context::MergedSections
+	// 搜集好后，还是加入 Context::Chunks，这个动作和上面 CreateSyntheticSections
+	// 的动作好像，所以我也认为这些部分应该都属于为 output 做准备
 	ctx.Chunks = append(ctx.Chunks, linker.CollectOutputSections(ctx)...)
 
+	// 处理 NeedsGotTp
 	linker.ScanRelocations(ctx)
 
+	// 计算 output section 的 shdr 的 size/align 信息
 	linker.ComputeSectionSizes(ctx)
 
+	// 对输出的 output section 进行排序
 	linker.SortOutputSections(ctx)
 
 	for _, chunk := range ctx.Chunks {
 		chunk.UpdateShdr(ctx)
 	}
 
+	// 获取最终文件的大小，这样后面 Ctx.Buf 的空间就可以提前申请下来，
+	// 为后面的 CopyBuf 做好准备。
 	fileSize := linker.SetOutputSectionOffsets(ctx)
 
+	// 为 Context 分配写出 output 的内存
 	ctx.Buf = make([]byte, fileSize)
 
+	// 创建 output 文件
 	file, err := os.OpenFile(ctx.Args.Output, os.O_RDWR|os.O_CREATE, 0777)
 	utils.MustNo(err)
 
+	// 将 chunk 写入 Context 的 buf
 	for _, chunk := range ctx.Chunks {
 		chunk.CopyBuf(ctx)
 	}
 
+	// 最后将 Contxt 的 buf 中的内容写入 output 文件
 	_, err = file.Write(ctx.Buf)
 	utils.MustNo(err)
 }

@@ -66,7 +66,7 @@ func GetMergedSectionInstance(
 
 // Insert 的处理逻辑如下：
 // 如果是一个新的项，那么就新建一个 SectionFragment，并加入到 MergedSection 的 Map 中
-// 否则就合并，所谓合并就是原来的 Map 中已经有内容相同的 SectionFragment
+// 否则就合并，所谓合并就是原来的 Map 中已经有内容相同的 SectionFragment 就不加入了
 // 最后将新建或者找到的同名 SectionFragment 的指针返回
 // 注意，对于新建的 fragment，除了对齐方式可能会被赋值，其他成员此时还未初始化。
 func (m *MergedSection) Insert(

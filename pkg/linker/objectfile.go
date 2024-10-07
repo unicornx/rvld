@@ -326,7 +326,6 @@ func (o *ObjectFile) ClearSymbols() {
 //
 // 具体的处理由 splitSection 完成，也就是将 section中的元素分割开，便于后继处理
 // 注意分割处理后 isec.IsAlive 就从 true 变为 false
-// FIXME：所以我现在理解这里之所以 
 func (o *ObjectFile) InitializeMergeableSections(ctx *Context) {
 	o.MergeableSections = make([]*MergeableSection, len(o.Sections))
 	for i := 0; i < len(o.Sections); i++ {
@@ -417,33 +416,42 @@ func splitSection(ctx *Context, isec *InputSection) *MergeableSection {
 
 func (o *ObjectFile) RegisterSectionPieces() {
 	for _, m := range o.MergeableSections {
-		// 跳过没有转化为 mergeable 的 inputsection
+		// 跳过不需要处理 merge 的 inputsection
 		if m == nil {
 			continue
 		}
 
-		m.Fragments = make([]*SectionFragment, 0, len(m.Strs))
-		// 通过遍历 mergeable section 的列表（m.Strs 本质上是这个）
-		// 不仅更新了 m.Fragments, 还更新了 m.Parent 的 map
-		// 再次重温，Mergable Section 是 objectfile domain 的
-		// Merged Section 是 Context domain 的
-		// 所以 m.Fragments 存放的是该 mergeable section 的 fragments，值得
-		// 注意的是，即使 fragments 有重复的，在这里不会去重。
-		// 而 MergedSection 的 map 中必定是已经去重了的
-		//
+		// 这里本质是进行 merge 处理
+		// m.Strs 的项目是该 mergeable section 中所有的成员
+		// m.Fragments 中存放的实际是指向 MergedSection 中的 fragment 的指针
+		// m.Fragments 的个数和 m.Strs 是相同的，但注意，经过下面 for
+		// 循环的处理后，m.Fragments 的一些成员（指针）指向的对象可能是
+		// 相同的了。
+		// 这是因为，for 循环中调用 MergedSection::Insert() 这个函数
+		// 会对 fragment 去重，如果是重复的会返回已经存在的项的指针。
+		// 这也是我们对 MergedSection 采用 map 数据结果的原因，通过
+		// map 字典进行快速去重处理。
 		// 另外还是要提醒自己，此时对于新建的 SectionFragment，在 Insert 中
 		// 创建时部分成员没有初始化，究竟何时才会初始化？FIXME
+		m.Fragments = make([]*SectionFragment, 0, len(m.Strs))
+
 		for i := 0; i < len(m.Strs); i++ {
 			m.Fragments = append(m.Fragments,
 				m.Parent.Insert(m.Strs[i], uint32(m.P2Align)))
 		}
 	}
+	// 经过上面的处理后，当前 objfile 中的 mergeable section 的去重工作已经基本完成。
+	// 其对应的 merged section 也更新完毕。
+	// 之所以要保存一份 Fragments。原因是本函数中下面的处理会还会用到，具体的
+	// 使用在 GetFragment 中。FIXME 其实我觉得 MergeableSection::Fragments 可以
+	// 做成一个本函数的局部变量，或者如果担心太大，可以用堆或者全局方式实现，因为
+	// 查了一下代码，MergeableSection::Fragments 的使用范围也就只在这个 RegisterSectionPieces() 里。
+	// 即使 GetFragment 要用，也可以通过传参方式让其可以访问。
 
 	// 要读懂这段代码，其实有一个背景知识需要理解
 	// 就是符号本身也可能需要去重
 	// 但实际的例子我暂时也没有想到，从课程的讲述中貌似是代码有可能定义一些常量字符串
 	// 并且会有符号引用这些常量字符串，那么这些字符串也可能需要去重
-	//
 	for i := 1; i < len(o.ElfSyms); i++ {
 		sym := o.Symbols[i]
 		esym := &o.ElfSyms[i]
@@ -453,7 +461,7 @@ func (o *ObjectFile) RegisterSectionPieces() {
 		}
 
 		// 找到这个符号所对应的 MergeableSection
-		// 这里能用 GetShndx 原因时 MergeableSections 和 InputSections 数组时一一对应的
+		// 这里能用 GetShndx 原因是 MergeableSections 和 InputSections 数组是一一对应的
 		m := o.MergeableSections[o.GetShndx(esym, i)]
 		if m == nil {
 			continue
@@ -476,6 +484,9 @@ func (o *ObjectFile) SkipEhframeSections() {
 	}
 }
 
+// SHF_ALLOC：The section will be loaded to virtual memory at runtime.
+// 也就是说只有这些 section 需要留下来写到 output section 中去
+// 针对这些 section 进行进一步的扫描
 func (o *ObjectFile) ScanRelocations() {
 	for _, isec := range o.Sections {
 		if isec != nil && isec.IsAlive &&

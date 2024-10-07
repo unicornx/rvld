@@ -175,7 +175,14 @@ func SetOutputSectionOffsets(ctx *Context) uint64 {
 	return fileoff
 }
 
+// 在我们 NewInputSection 中，已经为每个 Inputsection 找到了其归属的 OutputSection
+// 所以这里再将所有的 InputSection 再过滤一遍，各自归纳到自己所属的 OutputSection 下面去。
+// FIXME: 这个函数名字实在让人费解
 func BinSections(ctx *Context) {
+	// group 自身是一个数组，数组的 size 和 Context::OutputSections 相同
+	// 所以 group 的成员实际上就是对应的 OutputSections 的成员
+	// 所以 idx 就是 OutputSection 的 index
+	// group 的每个元素又是一个数组，用来存放一个 Outputsection 对应的多个 InputSection
 	group := make([][]*InputSection, len(ctx.OutputSections))
 	for _, file := range ctx.Objs {
 		for _, isec := range file.Sections {
@@ -183,11 +190,18 @@ func BinSections(ctx *Context) {
 				continue
 			}
 
+			// isec.OutputSection 即该 inputsection 所属的 Outputsection
+			// 这个是在 NewInputSection 中已经确定了的
+			// 然后我们再根据 这个outputsection 在 Cxt.OutputSections
+			// 数组中的下标找到其位置后 append 到对应的 group 中
 			idx := isec.OutputSection.Idx
 			group[idx] = append(group[idx], isec)
 		}
 	}
 
+	// 把 group[idx] 赋值给对应的 output section 的 Members
+	// 这样处理后，ctx.OutputSections 中的每个 outputsection 的 Members
+	// 对应的 inputsection 就是同类型的了。
 	for idx, osec := range ctx.OutputSections {
 		osec.Members = group[idx]
 	}
@@ -215,13 +229,19 @@ func ComputeSectionSizes(ctx *Context) {
 		offset := uint64(0)
 		p2align := int64(0)
 
+		// 这里是再设置 inputsection 的 offset
+		// 在 pkg/linker/outputsection.go 中的
+		// OutputSection::CopyBuf 中在调用 isec.WriteTo
+		// 时会用到这个值。
 		for _, isec := range osec.Members {
 			offset = utils.AlignTo(offset, 1<<isec.P2Align)
+			// 核心是更新这个值
 			isec.Offset = uint32(offset)
 			offset += uint64(isec.ShSize)
 			p2align = int64(math.Max(float64(p2align), float64(isec.P2Align)))
 		}
 
+		// 经过上面的循环后，整个 outputsection 的 size 也确定出来了
 		osec.Shdr.Size = offset
 		osec.Shdr.AddrAlign = 1 << p2align
 	}
@@ -274,7 +294,12 @@ func ComputeMergedSectionSizes(ctx *Context) {
 	}
 }
 
+// 和 NeedsGotTp 处理有关
 func ScanRelocations(ctx *Context) {
+	// 遍历 Context 中的 obj 文件
+	// 对每个 obj 文件调用 ScanRelocations，具体操作是
+	// 遍历该 obj 文件的 input section，如果这个 section 具备 SHF_ALLOC
+	// 则会执行一些特殊处理
 	for _, file := range ctx.Objs {
 		file.ScanRelocations()
 	}

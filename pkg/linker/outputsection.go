@@ -2,6 +2,11 @@ package linker
 
 import "debug/elf"
 
+// @Members：一个 OutputSection 对应多个“同名”的 InputSection
+//           FIXME：没有看懂的是，代码中如何保证 OutputSection 对应的 InputSection 是同一个类型的？
+// @Idx: 本 outputsection 在 ctx.OutputSections 数组中的下标
+//       这个值的确定在 GetOutputSection() 中最后 NewOutputSection() 时传入的第三个参数
+//       uint32(len(ctx.OutputSections))
 type OutputSection struct {
 	Chunk
 	Members []*InputSection

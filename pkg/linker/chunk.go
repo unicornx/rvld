@@ -10,7 +10,7 @@ type Chunker interface {
 }
 
 // Chunk 本身作为一个基类
-// 
+// @Shndx: FIXME，这个成员似乎没有用到
 type Chunk struct {
 	Name  string
 	Shdr  Shdr

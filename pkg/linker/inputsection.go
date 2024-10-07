@@ -28,7 +28,7 @@ import (
  * @Offset:
  * @OutputSection: 该 input section 对应的 output section
  * @RelsecIdx: 对于类型为 SHT_RELA 的 section（重定位表），这个属性存放了该重定位
- *             表所作用的 section 在 section table 中的 index 
+ *             表的 section 在 section table 中的 index
  * @Rels: 
  */
 type InputSection struct {
@@ -99,6 +99,7 @@ func (i *InputSection) Name() string {
 }
 
 func (i *InputSection) WriteTo(ctx *Context, buf []byte) {
+	// .bss 就是 SHT_NOBITS
 	if i.Shdr().Type == uint32(elf.SHT_NOBITS) || i.ShSize == 0 {
 		return
 	}
@@ -115,13 +116,18 @@ func (i *InputSection) CopyContents(buf []byte) {
 }
 
 func (i *InputSection) GetRels() []Rela {
+	// FIXME: 对 i.Rels 的判断有何作用？什么情况下会走这个分支？
+	// 估计是 GetRels 这个函数会被两处调用：
+	// 一处是 ScanRelocations，另一处是 ApplyRelocAlloc
 	if i.RelsecIdx == math.MaxUint32 || i.Rels != nil {
 		return i.Rels
 	}
 
+	// 将重定位表数据从其所在 section 中读取出来然后分片
 	bs := i.File.GetBytesFromShdr(
 		&i.File.InputFile.ElfSections[i.RelsecIdx])
 	i.Rels = utils.ReadSlice[Rela](bs, RelaSize)
+	// 最后形成 Rels 的数组后返回。
 	return i.Rels
 }
 

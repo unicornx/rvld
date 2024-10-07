@@ -9,7 +9,8 @@ type ContextArgs struct {
 /*
  * @Args: 我们感兴趣的一些需要记下来的命令行选项参数值
  * @Buf
- * @Ehdr
+ *
+ * @Ehdr: 具体见 pkg/linker/outputehdr.go， 用于对 output 文件中写入 ELF header
  * @Shdr
  * @Phdr
  * @Got
@@ -25,7 +26,16 @@ type ContextArgs struct {
  *                              -> InitializeSections
  *                                 -> NewInputSection
  *                                    -> GetOutputSection
- * @Chunks: 最终生成写出去的文件是 ELF 格式，可以看成由多个 Chunk（块）组成。譬如 section header 就是一个 chunk
+ * @Chunks: 最终生成写出去的文件是 ELF 格式，可以看成由多个 Chunk（块）组成。
+ *          譬如 section header 就是一个 chunk
+ *          典型的 chunk 以及它们出现的顺序如下（具体参考 SortOutputSections）：
+ *          - Ehdr
+ *          - Shdr
+ *          - Phdr
+ *          - GOT
+ *          - output section
+ *          - merged section
+ *          
  * @Objs: 所有输入文件中的 obj 文件，包括 .o 文件以及 .a 文件中 extracted 的 .o 文件
  * @SymbolMap: 所有输入文件的 GLOBAL 符号。
  *             这些符号的添加动作参考 GetSymbolByName() 函数

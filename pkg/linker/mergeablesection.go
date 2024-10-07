@@ -46,9 +46,14 @@ import "sort"
 // 放在一个特殊的 section 种，并将该 section标记为 mergeable。
 // 然后交给链接器，链接器在处理的时候对于这些 mergable 的 section只保留一份copy
 
-// @Parent: FIXME 怎么理解？好像每个 MergeableSection 都对应一个MergedSection？
-//          MergedSection vs MergableSection 是 1:N 的关系？
-//          我现在的理解是，假设以字符串section为例，所有的 object 文件的 .strtab section
+// @Parent: 每个 MergeableSection 都对应一个 MergedSection
+//          MergedSection vs MergableSection 是 1:N 的关系
+//          在设计上，存在如下关系：
+//          Context 中维护所有 MergedSection，存放在一个数组中，即 Context::MergedSections
+//          每个 MergedSection 对应多个 objfile 中的 MergableSection，至于哪些 MergableSection 会
+//          被 merge 为一个 MergedSection，这个由 name/flags/types 三元组决定，MergedSection 
+//          由函数 splitSection() 中调用 GetMergedSectionInstance() 生成。
+//          假设以字符串section为例，所有的 object 文件的 .strtab section
 //          在最后输出的可执行文件中就会被 merge 成一个。
 // @P2Align:
 // @Strs: 一个数组，用于存放分割（split）后的元素

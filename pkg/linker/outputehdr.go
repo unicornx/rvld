@@ -14,6 +14,7 @@ type OutputEhdr struct {
 func NewOutputEhdr() *OutputEhdr {
 	return &OutputEhdr{Chunk{
 		Shdr: Shdr{
+			// 没有 name，所以没有初始化名字
 			Flags:     uint64(elf.SHF_ALLOC),
 			Size:      uint64(EhdrSize),
 			AddrAlign: 8,
@@ -67,5 +68,7 @@ func (o *OutputEhdr) CopyBuf(ctx *Context) {
 	buf := &bytes.Buffer{}
 	err := binary.Write(buf, binary.LittleEndian, ehdr)
 	utils.MustNo(err)
+	// ehdr.Shdr.Offset 在 NewOutputEhdr 中并没有初始化，
+	// 默认为 0，而 Ehdr 正好是第一个 chunk
 	copy(ctx.Buf[o.Shdr.Offset:], buf.Bytes())
 }
