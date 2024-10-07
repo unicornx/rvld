@@ -14,6 +14,7 @@ import "math"
 // @IsAlive: 这个是 Fragment 级别的 IsAlive 标记
 //           我们现在一共看到有三个级别：
 //           InputFile / InputSection / SectionFragment
+//	     FIXME：感觉貌似没有用上？
 type SectionFragment struct {
 	OutputSection *MergedSection
 	Offset        uint32

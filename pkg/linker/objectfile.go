@@ -417,17 +417,33 @@ func splitSection(ctx *Context, isec *InputSection) *MergeableSection {
 
 func (o *ObjectFile) RegisterSectionPieces() {
 	for _, m := range o.MergeableSections {
+		// 跳过没有转化为 mergeable 的 inputsection
 		if m == nil {
 			continue
 		}
 
 		m.Fragments = make([]*SectionFragment, 0, len(m.Strs))
+		// 通过遍历 mergeable section 的列表（m.Strs 本质上是这个）
+		// 不仅更新了 m.Fragments, 还更新了 m.Parent 的 map
+		// 再次重温，Mergable Section 是 objectfile domain 的
+		// Merged Section 是 Context domain 的
+		// 所以 m.Fragments 存放的是该 mergeable section 的 fragments，值得
+		// 注意的是，即使 fragments 有重复的，在这里不会去重。
+		// 而 MergedSection 的 map 中必定是已经去重了的
+		//
+		// 另外还是要提醒自己，此时对于新建的 SectionFragment，在 Insert 中
+		// 创建时部分成员没有初始化，究竟何时才会初始化？FIXME
 		for i := 0; i < len(m.Strs); i++ {
 			m.Fragments = append(m.Fragments,
 				m.Parent.Insert(m.Strs[i], uint32(m.P2Align)))
 		}
 	}
 
+	// 要读懂这段代码，其实有一个背景知识需要理解
+	// 就是符号本身也可能需要去重
+	// 但实际的例子我暂时也没有想到，从课程的讲述中貌似是代码有可能定义一些常量字符串
+	// 并且会有符号引用这些常量字符串，那么这些字符串也可能需要去重
+	//
 	for i := 1; i < len(o.ElfSyms); i++ {
 		sym := o.Symbols[i]
 		esym := &o.ElfSyms[i]
@@ -436,6 +452,8 @@ func (o *ObjectFile) RegisterSectionPieces() {
 			continue
 		}
 
+		// 找到这个符号所对应的 MergeableSection
+		// 这里能用 GetShndx 原因时 MergeableSections 和 InputSections 数组时一一对应的
 		m := o.MergeableSections[o.GetShndx(esym, i)]
 		if m == nil {
 			continue

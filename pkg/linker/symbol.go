@@ -17,7 +17,7 @@ const (
  * @InputSection: 符号所对应的 InputSection（linker 域）
  * @SectionFragment: 符号也可能属于一个 MergableSection中的 SectionFragment
  *                   具体的例子按照课程视频的说明，假如代码中一个字符串也可能
- *                   会对应到一个符号。FIXME， 具体例子还要看看
+ *                   会对应到一个符号（譬如 c 语言中的字符串常量?）。FIXME， 具体例子还要看看
  * 上面两个属性同时只有一个为 !nul
  * 这个设计和处理 mergable section 有关
  * 因为根据课程的设计，如果一个 InputSection 是 mergable 的，那么它会被
